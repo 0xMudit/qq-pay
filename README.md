@@ -1,0 +1,35 @@
+# Qq Pay
+
+Idempotent sandbox payments with atomic double-entry capture.
+
+**0.1.0-beta.1** · Python 3.12 · FastAPI · PostgreSQL · MIT
+
+A small, runnable backend portfolio project with explicit correctness boundaries.
+
+## Run locally
+
+```sh
+python -m venv .venv
+# Activate .venv for your shell
+pip install -r requirements.txt
+# Set API_KEY to a random secret of at least 16 characters
+uvicorn app:app --reload
+```
+
+Local mode uses SQLite. Open http://localhost:8000/docs and supply `x-api-key` for protected operations. Health is public. For PostgreSQL, copy `.env.example` to `.env`, replace its secret, and run `docker compose up --build`. Run projects individually or change their host port mappings.
+
+```sh
+python -m pytest -q
+```
+
+## Design
+
+See [architecture](docs/architecture.md), [operations](docs/operations.md), and [feature backlog](issues/README.md). API schemas and executable requests are available in `/docs`.
+
+## Beta boundaries
+
+Single trusted operator API key; no tenant isolation, public deployment hardening, measured throughput claims, or production SLA. SQLite is a development convenience. PostgreSQL concurrency must be validated before deployment. Schema bootstrap is intended for a fresh database; versioned migrations are a roadmap item.
+
+## Contributing
+
+Open an issue describing the behavior and reproduction. Submit focused pull requests with tests for failure modes. Never commit credentials or personal location data.
