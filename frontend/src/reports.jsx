@@ -137,7 +137,7 @@ export function Reports({ currency, onCurrencyChange, overview, rows }) {
                       className={
                         row.ledger_balance
                           ? "text-destructive"
-                          : "text-emerald-700"
+                          : "text-emerald-300"
                       }
                     >
                       {row.ledger_balance

@@ -1,3 +1,4 @@
+import { CreditCard } from "lucide-react";
 import { LayoutDashboard, List, WalletCards } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -28,7 +29,7 @@ import { toast } from "sonner";
 export const brand = {
   name: "Pay",
   mark: "P",
-  dark: false,
+  dark: true,
   heading: "A workspace for your checkouts.",
   description:
     "Create payment links, review sandbox transactions, and reconcile the ledger.",
@@ -246,7 +247,7 @@ function Login({ onLogin }) {
         <a href="/lab">System design lab ↗</a>
       </aside>
       <section>
-        <Card className="w-full max-w-md">
+        <Card className="w-full max-w-sm">
           <CardHeader>
             <CardTitle className="text-2xl">
               {register ? "Create an account" : "Sign in"}
@@ -317,7 +318,10 @@ function Login({ onLogin }) {
 export function Brand() {
   return (
     <div className="brand">
-      <span>{brand.mark}</span> QQ {brand.name}
+      <span aria-hidden="true">
+        <CreditCard />
+      </span>{" "}
+      QQ {brand.name}
     </div>
   );
 }

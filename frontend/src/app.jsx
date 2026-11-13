@@ -72,6 +72,7 @@ function Merchant({ section }) {
     <>
       <div className="page-heading merchant-heading">
         <div>
+          <span className="product-context">Merchant workspace</span>
           <h1>
             {section === "overview"
               ? "Overview"
