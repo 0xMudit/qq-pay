@@ -1,3 +1,4 @@
+import { Reports } from "./reports";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +18,6 @@ import {
   Choice,
   Modal,
   Notice,
-  Metrics,
   Status,
   action,
   post,
@@ -28,32 +28,42 @@ import {
 } from "./shared";
 import { toast } from "sonner";
 
-const states = ["pending", "captured", "refunded", "cancelled"];
-function Merchant() {
+const states = ["pending", "captured", "refunded", "cancelled", "expired"];
+function Merchant({ section }) {
   const { rows, error, refresh } = useRecords("/payments", 8000);
   const [open, setOpen] = useState(false),
     [detail, setDetail] = useState(null),
     [query, setQuery] = useState(""),
     [filter, setFilter] = useState("all"),
     [currency, setCurrency] = useState("INR"),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [refundBusy, setRefundBusy] = useState(false),
+    [reportCurrency, setReportCurrency] = useState("INR"),
+    [expiry, setExpiry] = useState("1440");
   const key = useRef(crypto.randomUUID());
-  const count = (state) => rows.filter((p) => p.status === state).length;
-  const total = rows
-    .filter((p) => p.status === "captured" && p.currency === "INR")
-    .reduce((n, p) => n + p.amount, 0);
+  const refundKey = useRef(crypto.randomUUID());
   const payment = detail?.payment;
   const openDetail = async (id) => setDetail(await api("/payments/" + id));
   useEffect(() => {
     const latest = rows.find((row) => row.id === payment?.id);
-    if (latest && latest.status !== payment.status)
+    if (
+      latest &&
+      (latest.status !== payment.status ||
+        latest.refunded_amount !== payment.refunded_amount)
+    )
       action(() => openDetail(latest.id));
-  }, [rows, payment?.id, payment?.status]);
+  }, [rows, payment?.id, payment?.status, payment?.refunded_amount]);
   return (
     <>
       <div className="page-heading merchant-heading">
         <div>
-          <h1>Transactions</h1>
+          <h1>
+            {section === "overview"
+              ? "Overview"
+              : section === "reports"
+                ? "Reconciliation"
+                : "Transactions"}
+          </h1>
           <p className="text-muted-foreground">
             Create, share, and manage sandbox checkouts.
           </p>
@@ -61,77 +71,82 @@ function Merchant() {
         <Button onClick={() => setOpen(true)}>Create checkout</Button>
       </div>
       <Notice>{error}</Notice>
-      <Metrics
-        values={[
-          ["Captured · INR", money(total, "INR")],
-          ["Awaiting payment", count("pending")],
-          ["Captured", count("captured")],
-          ["Refunded", count("refunded")],
-        ]}
-      />
-      <Card>
-        <CardHeader>
-          <CardTitle>Checkout activity</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-4">
-          <div className="flex flex-wrap items-end gap-3">
-            <Input
-              aria-label="Search checkouts"
-              className="max-w-xs"
-              placeholder="Search by checkout title"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            <Choice
-              label="Checkout status"
-              value={filter}
-              onChange={setFilter}
-              options={[["all", "All statuses"], ...states.map((s) => [s, s])]}
-            />
-          </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {["Checkout", "Amount", "Status", "Created", ""].map((h) => (
-                  <TableHead key={h}>{h}</TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows
-                .filter(
-                  (p) =>
-                    (filter === "all" || p.status === filter) &&
-                    p.title.toLowerCase().includes(query.toLowerCase()),
-                )
-                .map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell>{p.title}</TableCell>
-                    <TableCell>{money(p.amount, p.currency)}</TableCell>
-                    <TableCell>
-                      <Status>{p.status}</Status>
-                    </TableCell>
-                    <TableCell>{date(p.created)}</TableCell>
-                    <TableCell>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => action(() => openDetail(p.id))}
-                      >
-                        View checkout
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-            </TableBody>
-          </Table>
-          {!rows.length && (
-            <p className="py-8 text-center text-muted-foreground">
-              Create a checkout to get started.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+      {section !== "payments" && (
+        <Reports
+          currency={reportCurrency}
+          onCurrencyChange={setReportCurrency}
+          overview={section === "overview"}
+          rows={rows}
+        />
+      )}
+      {section !== "reports" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Checkout activity</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            <div className="flex flex-wrap items-end gap-3">
+              <Input
+                aria-label="Search checkouts"
+                className="max-w-xs"
+                placeholder="Search by checkout title"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+              <Choice
+                label="Checkout status"
+                value={filter}
+                onChange={setFilter}
+                options={[
+                  ["all", "All statuses"],
+                  ...states.map((s) => [s, s]),
+                ]}
+              />
+            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {["Checkout", "Amount", "Status", "Created", ""].map((h) => (
+                    <TableHead key={h}>{h}</TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows
+                  .filter(
+                    (p) =>
+                      (filter === "all" || p.status === filter) &&
+                      p.title.toLowerCase().includes(query.toLowerCase()),
+                  )
+                  .map((p) => (
+                    <TableRow key={p.id}>
+                      <TableCell>{p.title}</TableCell>
+                      <TableCell>{money(p.amount, p.currency)}</TableCell>
+                      <TableCell>
+                        <Status>{p.status}</Status>
+                      </TableCell>
+                      <TableCell>{date(p.created)}</TableCell>
+                      <TableCell>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => action(() => openDetail(p.id))}
+                        >
+                          View checkout
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+              </TableBody>
+            </Table>
+            {!rows.length && (
+              <p className="py-8 text-center text-muted-foreground">
+                Create a checkout to get started.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
       <Modal
         open={open}
         onOpenChange={setOpen}
@@ -157,6 +172,7 @@ function Merchant() {
                   title: data.get("title"),
                   amount: Number(whole) * 100 + Number(fraction.padEnd(2, "0")),
                   currency,
+                  expires_in_minutes: expiry === "none" ? null : Number(expiry),
                   idempotency_key: key.current,
                 });
                 key.current = crypto.randomUUID();
@@ -193,6 +209,20 @@ function Merchant() {
             }}
             options={["INR", "USD", "EUR"].map((c) => [c, c])}
           />
+          <Choice
+            label="Link expires after"
+            value={expiry}
+            onChange={(value) => {
+              setExpiry(value);
+              key.current = crypto.randomUUID();
+            }}
+            options={[
+              ["60", "1 hour"],
+              ["1440", "24 hours"],
+              ["10080", "7 days"],
+              ["none", "Never"],
+            ]}
+          />
           <Button disabled={busy}>Create checkout link</Button>
         </form>
       </Modal>
@@ -210,6 +240,16 @@ function Merchant() {
               <strong>{money(payment.amount, payment.currency)}</strong>
               <Status>{payment.status}</Status>
             </div>
+            {payment.expires && (
+              <p className="text-sm text-muted-foreground">
+                Link expiry {date(payment.expires)}
+              </p>
+            )}
+            {payment.refunded_amount > 0 && (
+              <p className="text-sm">
+                Refunded {money(payment.refunded_amount, payment.currency)}
+              </p>
+            )}
             <div className="flex flex-wrap gap-2">
               <Button asChild variant="outline">
                 <a
@@ -250,21 +290,57 @@ function Merchant() {
             </div>
             {payment.status === "captured" && (
               <form
+                key={payment.id}
                 className="grid gap-3"
+                onChange={() => {
+                  refundKey.current = crypto.randomUUID();
+                }}
                 onSubmit={(event) => {
                   event.preventDefault();
-                  const reason = new FormData(event.currentTarget).get(
-                    "reason",
-                  );
+                  const form = event.currentTarget;
+                  const data = new FormData(form);
+                  setRefundBusy(true);
                   action(async () => {
-                    await post("/payments/" + payment.id + "/refund", {
-                      reason,
-                    });
-                    await openDetail(payment.id);
-                    await refresh();
+                    try {
+                      const amount = String(data.get("refundAmount")).trim();
+                      if (amount && !/^\d{1,7}(\.\d{1,2})?$/.test(amount))
+                        throw Error(
+                          "Enter an amount with up to two decimal places",
+                        );
+                      const [whole, fraction = ""] = amount.split(".");
+                      await post("/payments/" + payment.id + "/refund", {
+                        reason: data.get("reason"),
+                        amount: amount
+                          ? Number(whole) * 100 +
+                            Number(fraction.padEnd(2, "0"))
+                          : null,
+                        idempotency_key: refundKey.current,
+                      });
+                      refundKey.current = crypto.randomUUID();
+                      form.reset();
+                      await openDetail(payment.id);
+                      await refresh();
+                      toast.success("Sandbox refund recorded");
+                    } finally {
+                      setRefundBusy(false);
+                    }
                   });
                 }}
               >
+                <p className="text-sm">
+                  Available to refund{" "}
+                  {money(
+                    payment.amount - payment.refunded_amount,
+                    payment.currency,
+                  )}
+                </p>
+                <Field
+                  id="refund-amount"
+                  name="refundAmount"
+                  label="Refund amount (optional)"
+                  placeholder="Leave blank to refund the remainder"
+                  inputMode="decimal"
+                />
                 <Field
                   id="reason"
                   name="reason"
@@ -273,7 +349,9 @@ function Merchant() {
                   maxLength={200}
                   required
                 />
-                <Button variant="destructive">Issue full sandbox refund</Button>
+                <Button disabled={refundBusy} variant="destructive">
+                  Issue sandbox refund
+                </Button>
               </form>
             )}
             <h2>Ledger</h2>
@@ -328,6 +406,14 @@ function Checkout() {
               </strong>
               <Status>{payment.status}</Status>
               <Notice>Sandbox payment. No card details are needed.</Notice>
+              {payment.status === "expired" && (
+                <Notice>This checkout link has expired.</Notice>
+              )}
+              {payment.status === "captured" && (
+                <p className="text-sm text-muted-foreground">
+                  Receipt reference {payment.id}
+                </p>
+              )}
               {payment.status === "pending" && (
                 <Button
                   disabled={busy}

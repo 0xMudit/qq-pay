@@ -1,17 +1,17 @@
 # QQ Pay
 
-A usable sandbox merchant workspace for shareable checkouts, repeat-safe captures, full refunds, and an auditable balanced ledger.
+A usable sandbox merchant workspace for shareable checkouts, repeat-safe captures, partial and full refunds, and an auditable balanced ledger.
 
 [Open the beta](https://qq-pay.vercel.app) · [API reference](https://qq-pay.vercel.app/docs) · [Engineering lab](https://qq-pay.vercel.app/lab) · [Issues](https://github.com/0xMudit/qq-pay/issues)
 
-**v0.2.0-beta.1** · FastAPI · PostgreSQL / Supabase · Vercel · MIT
+**v0.3.0-beta.1** · FastAPI · PostgreSQL / Supabase · Vercel · MIT
 
 ## Use the application
 
 1. Create a private merchant account or use the shared demo credentials.
 2. Create a checkout with your own title, amount and currency.
 3. Share its checkout link; the customer completes a sandbox payment without signing in.
-4. Inspect the transaction and ledger, issue a full refund, or cancel an unpaid checkout.
+4. Inspect the transaction and ledger, issue a partial or full refund, cancel an unpaid checkout, or export transactions.
 
 ### Demo credentials
 
@@ -58,7 +58,7 @@ Amounts use integer minor units. Idempotency keys are unique within an account; 
 
 Checkout URLs are intentionally public and unguessable UUID links. They disclose the checkout title, merchant username, amount, currency and status to their holder. Merchant lists, refunds, cancellations, ledger details and API keys require account ownership.
 
-This release uses the **built-in sandbox**, as requested. It does not charge cards, settle funds or integrate a bank/provider. No card data is collected. Partial refunds, signed webhooks and external reconciliation are future features. A workspace holds up to 500 checkouts. Dashboard INR totals do not aggregate other currencies.
+This release uses the **built-in sandbox**, as requested. It does not charge cards, settle funds or integrate a bank/provider. No card data is collected. Partial refunds require an idempotency key and cannot exceed the unrefunded balance. Signed webhooks and external provider reconciliation are future features. A workspace holds up to 500 checkouts. The dashboard reports each currency separately. New links created in the dashboard expire after 24 hours by default. Older links retain their original behavior.
 
 ## Verification
 
@@ -77,3 +77,9 @@ No uptime SLA or measured throughput claim. Account usernames are not email addr
 See [CONTRIBUTING.md](CONTRIBUTING.md). Include failure-mode tests and explain concurrency assumptions in pull requests. Do not commit secrets or real location data. Licensed under MIT.
 
 The workspace uses React, Vite, Tailwind CSS, and official [shadcn/ui](https://ui.shadcn.com/) registry components in `frontend/src/components/ui`. Build the frontend before starting FastAPI or uploading a Vercel deployment.
+
+## Merchant dashboard
+
+- Overview shows captured, refunded and net volume by currency, plus a seven-day checkout chart.
+- Transactions provides search, status filters, checkout links, ledger entries and refund controls.
+- Reconciliation reports net merchant volume and ledger balance, with a CSV download.

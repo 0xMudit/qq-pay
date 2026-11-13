@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0-beta.1
+
+- Merchant dashboard with overview, transaction management, and per-currency reconciliation.
+- Expiring checkout links, replay-protected partial refunds, and account-scoped CSV export.
+
 ## 0.2.0-beta.1
 
 - Account registration, Argon2 login, revocable sessions and API keys.

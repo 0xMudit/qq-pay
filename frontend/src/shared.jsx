@@ -1,3 +1,4 @@
+import { LayoutDashboard, List, WalletCards } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -321,13 +322,40 @@ export function Brand() {
   );
 }
 function Workspace({ user, Product, logout }) {
+  const [section, setSection] = useState("overview");
+  const navigation = [
+    ["overview", "Overview", LayoutDashboard],
+    ["payments", "Transactions", List],
+    ["reports", "Reconciliation", WalletCards],
+  ];
   const [keysOpen, setKeysOpen] = useState(false);
   const [keys, setKeys] = useState([]);
   const [secret, setSecret] = useState("");
   const [busy, setBusy] = useState(false);
   const load = async () => setKeys(await api("/auth/keys"));
   return (
-    <div className="workspace">
+    <div className="workspace merchant-shell">
+      <aside className="merchant-sidebar">
+        <Brand />
+        <Badge variant="secondary">Sandbox</Badge>
+        <nav aria-label="Merchant navigation">
+          {navigation.map(([id, label, Icon]) => (
+            <Button
+              key={id}
+              variant={section === id ? "secondary" : "ghost"}
+              aria-current={section === id ? "page" : undefined}
+              onClick={() => setSection(id)}
+            >
+              <Icon />
+              {label}
+            </Button>
+          ))}
+        </nav>
+        <div className="merchant-links">
+          <a href="/docs">API reference ↗</a>
+          <a href="/lab">Engineering lab ↗</a>
+        </div>
+      </aside>
       <header className="topbar">
         <Brand />
         <nav>
@@ -353,7 +381,7 @@ function Workspace({ user, Product, logout }) {
         {user.id === "demo" && (
           <Notice>Shared demo workspace. Use synthetic data only.</Notice>
         )}
-        <Product />
+        <Product section={section} />
       </main>
       <footer>
         <a href="/docs">API reference ↗</a>

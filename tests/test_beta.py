@@ -91,6 +91,8 @@ def test_password_and_duplicate_account(client):
 
 
 TABLES = [
+    "beta_refunds",
+    "beta_checkout_expiry",
     "beta_events",
     "beta_ledger",
     "beta_payments",
@@ -156,3 +158,82 @@ def test_cancelled_checkout_not_payable(client):
     ).json()["id"]
     assert client.post("/api/payments/" + identifier + "/cancel").status_code == 200
     assert client.post("/api/checkout/" + identifier + "/pay").status_code == 409
+
+
+def test_partial_refund_replay_and_reconciliation(client):
+    signup(client)
+    payment = client.post(
+        "/api/payments",
+        json={
+            "title": "=1+1",
+            "amount": 1000,
+            "currency": "USD",
+            "idempotency_key": "checkout-partial",
+        },
+    ).json()
+    checkout = "/api/checkout/" + payment["id"]
+    private = "/api/payments/" + payment["id"]
+    assert client.post(checkout + "/pay").status_code == 200
+    body = {
+        "reason": "Returned item",
+        "amount": 250,
+        "idempotency_key": "refund-partial",
+    }
+    first = client.post(private + "/refund", json=body)
+    assert first.status_code == 200
+    assert client.post(private + "/refund", json=body).json() == first.json()
+    assert (
+        client.post(private + "/refund", json={**body, "amount": None}).status_code
+        == 409
+    )
+    assert (
+        client.post(
+            private + "/refund",
+            json={**body, "amount": 751, "idempotency_key": "refund-too-much"},
+        ).status_code
+        == 409
+    )
+    assert client.get(private).json()["payment"]["refunded_amount"] == 250
+    assert (
+        client.post(private + "/refund", json={"reason": "Refund remainder"}).json()[
+            "refunded_amount"
+        ]
+        == 1000
+    )
+    assert client.get("/api/reports/reconciliation").json() == [
+        {
+            "currency": "USD",
+            "captured": 1000,
+            "refunded": 1000,
+            "net": 0,
+            "ledger_balance": 0,
+            "entries": 6,
+        }
+    ]
+    assert "'=1+1" in client.get("/api/reports/payments.csv").text
+    other_user(client)
+    assert client.get("/api/reports/reconciliation").json() == []
+    assert "=1+1" not in client.get("/api/reports/payments.csv").text
+
+
+def test_expired_checkout_cannot_capture(client):
+    signup(client)
+    body = {
+        "title": "Short link",
+        "amount": 100,
+        "idempotency_key": "checkout-expiry",
+        "expires_in_minutes": 1,
+    }
+    identifier = client.post("/api/payments", json=body).json()["id"]
+    assert (
+        client.post("/api/payments", json={**body, "expires_in_minutes": 2}).status_code
+        == 409
+    )
+    with app.engine.begin() as db:
+        db.execute(
+            text("UPDATE beta_checkout_expiry SET expires=0 WHERE payment=:id"),
+            {"id": identifier},
+        )
+    assert client.get("/api/checkout/" + identifier).json()["status"] == "expired"
+    assert client.post("/api/checkout/" + identifier + "/pay").status_code == 409
+    assert client.get("/api/payments/" + identifier).json()["ledger"] == []
