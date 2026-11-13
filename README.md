@@ -33,3 +33,11 @@ Single trusted operator API key; no tenant isolation, public deployment hardenin
 ## Contributing
 
 Open an issue describing the behavior and reproduction. Submit focused pull requests with tests for failure modes. Never commit credentials or personal location data.
+
+## Checkout demo
+
+With the API running and API_KEY set, run `python demo.py`. It creates an INR payment, repeats the request, captures twice, and verifies exactly two balanced ledger entries. All payments are simulated; no payment provider is connected.
+
+## Project planning
+
+Track planned work in [GitHub Issues](https://github.com/0xMudit/qq-pay/issues). This beta favors a small auditable implementation; the roadmap records what is required before broader deployment.
