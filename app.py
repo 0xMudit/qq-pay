@@ -7,9 +7,24 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, Header, HTTPException
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import StaticPool
-engine = create_engine(os.getenv("DATABASE_URL", "sqlite:///data.db"), **({"connect_args":{"check_same_thread":False}, "poolclass":StaticPool} if os.getenv("DATABASE_URL", "").endswith(":memory:") else {}))
+database_url = os.getenv("DATABASE_URL", "sqlite:///data.db")
+engine_options = {"pool_pre_ping": True}
+if database_url.endswith(":memory:"):
+    engine_options.update(connect_args={"check_same_thread":False}, poolclass=StaticPool)
+elif database_url.startswith("postgresql"):
+    from sqlalchemy.pool import NullPool
+    engine_options.update(poolclass=NullPool, connect_args={"prepare_threshold":None})
+engine = create_engine(database_url, **engine_options)
+if database_url.startswith("postgresql"):
+    from sqlalchemy import event
+    @event.listens_for(engine, "connect")
+    def set_schema(connection, record):
+        with connection.cursor() as cursor:
+            cursor.execute("SET search_path TO qq_pay")
+        connection.commit()
+
 def auth(x_api_key: str = Header(default="")):
-    if not secrets.compare_digest(x_api_key, os.environ["API_KEY"]):
+    if not secrets.compare_digest(x_api_key.encode(), os.environ["API_KEY"].encode()):
         raise HTTPException(401, "Invalid API key")
 @asynccontextmanager
 async def lifespan(app):
@@ -49,3 +64,31 @@ def capture(identifier: str):
 @app.get("/payments/{identifier}/ledger", dependencies=[Depends(auth)])
 def ledger(identifier: str):
     with engine.connect() as c: return [dict(r) for r in c.execute(text("SELECT * FROM ledger WHERE payment=:id"),dict(id=identifier)).mappings()]
+
+from fastapi.responses import FileResponse
+from pathlib import Path
+@app.get("/")
+def dashboard(): return FileResponse(Path(__file__).with_name("demo.html"))
+
+# Shared database rate limiting bounds the public, fixed-input demonstration.
+SCHEMA += "; CREATE TABLE IF NOT EXISTS demo_limits (bucket BIGINT PRIMARY KEY, count INTEGER NOT NULL)"
+def demo_budget():
+    import time
+    bucket=int(time.time()//60)
+    with engine.begin() as c:
+        c.execute(text("DELETE FROM demo_limits WHERE bucket < :old"), {"old":bucket-2})
+        row=c.execute(text("INSERT INTO demo_limits VALUES(:bucket,1) ON CONFLICT(bucket) DO UPDATE SET count=demo_limits.count+1 WHERE demo_limits.count<30 RETURNING count"), {"bucket":bucket}).first()
+        if not row: raise HTTPException(429,"Demo is busy. Try again in a minute.")
+
+@app.post("/demo/run")
+def demo_run():
+    demo_budget()
+    # Fixed synthetic checkout. No card data, provider calls or money movement.
+    body=Payment(amount=49900,currency="INR")
+    key="public-demo-checkout-v1"
+    first=create_payment(body,key)
+    second=create_payment(body,key)
+    captured=capture(first['id'])
+    capture(first['id'])
+    entries=ledger(first['id'])
+    return {"title":"Duplicate checkout handled safely", "checks":["Repeated request returns the same payment" if first['id']==second['id'] else "FAILED", "Repeated capture creates no extra ledger entries", "Debits and credits sum to zero"], "record":{"payment":captured,"entries":entries,"balance":sum(x['amount'] for x in entries)}}

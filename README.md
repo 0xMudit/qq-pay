@@ -41,3 +41,9 @@ With the API running and API_KEY set, run `python demo.py`. It creates an INR pa
 ## Project planning
 
 Track planned work in [GitHub Issues](https://github.com/0xMudit/qq-pay/issues). This beta favors a small auditable implementation; the roadmap records what is required before broader deployment.
+
+## Public engineering demo
+
+The Vercel deployment uses Supabase PostgreSQL in a private `qq_pay` schema. Open the home page and select **Run the demo**. The public endpoint accepts no arbitrary workload or financial data; it runs a fixed synthetic scenario with a database-backed limit of 30 runs per minute. Operator APIs still require a secret API key.
+
+See [deployment and design decisions](docs/deployment.md).

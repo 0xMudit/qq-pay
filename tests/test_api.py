@@ -30,3 +30,10 @@ def clean_database():
                     table_name=table.split('EXISTS ')[1].split(' ')[0]
                     db.execute(app.text('DELETE FROM '+table_name))
     yield
+
+def test_public_demo():
+    with TestClient(app.app) as c:
+        assert c.get('/').status_code==200
+        response=c.post('/demo/run')
+        assert response.status_code==200
+        assert 'FAILED' not in response.json()['checks']
