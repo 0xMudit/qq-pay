@@ -25,6 +25,8 @@ The demo is a shared public account. Its data and API keys are visible to others
 ```sh
 python -m venv .venv
 # Activate .venv using your shell's command.
+npm ci --prefix frontend
+npm run build --prefix frontend
 pip install -r requirements.txt
 # Set API_KEY to a random secret of at least 16 characters.
 uvicorn app:app --reload
@@ -73,3 +75,5 @@ No uptime SLA or measured throughput claim. Account usernames are not email addr
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Include failure-mode tests and explain concurrency assumptions in pull requests. Do not commit secrets or real location data. Licensed under MIT.
+
+The workspace uses React, Vite, Tailwind CSS, and official [shadcn/ui](https://ui.shadcn.com/) registry components in `frontend/src/components/ui`. Build the frontend before starting FastAPI or uploading a Vercel deployment.

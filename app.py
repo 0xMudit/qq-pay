@@ -221,7 +221,7 @@ app.include_router(product.router)
 
 @app.get("/lab", include_in_schema=False)
 def engineering_lab():
-    return FileResponse(Path(__file__).with_name("demo.html"))
+    return FileResponse(Path(__file__).with_name("application.html"))
 
 
 @app.get("/checkout/{identifier}", include_in_schema=False)
