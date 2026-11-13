@@ -45,14 +45,29 @@ function Merchant({ section }) {
   const payment = detail?.payment;
   const openDetail = async (id) => setDetail(await api("/payments/" + id));
   useEffect(() => {
-    const latest = rows.find((row) => row.id === payment?.id);
+    if (!payment) return;
+    const latest = rows.find((row) => row.id === payment.id);
     if (
-      latest &&
-      (latest.status !== payment.status ||
-        latest.refunded_amount !== payment.refunded_amount)
+      !latest ||
+      (latest.status === payment.status &&
+        latest.refunded_amount === payment.refunded_amount)
     )
-      action(() => openDetail(latest.id));
-  }, [rows, payment?.id, payment?.status, payment?.refunded_amount]);
+      return;
+    let cancelled = false;
+    api("/payments/" + payment.id)
+      .then((result) => {
+        if (!cancelled)
+          setDetail((current) =>
+            current?.payment === payment ? result : current,
+          );
+      })
+      .catch((error) => {
+        if (!cancelled) toast.error(error.message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [rows, payment?.id]);
   return (
     <>
       <div className="page-heading merchant-heading">
