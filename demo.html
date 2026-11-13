@@ -1,3 +1,153 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>QQ Pay · Engineering demo</title><style>
-:root{color-scheme:dark;--accent:#b9f76a}*{box-sizing:border-box}body{margin:0;background:#101512;color:#eef3ec;font:16px/1.6 system-ui,sans-serif}main{max-width:1160px;margin:auto;padding:28px}nav{display:flex;justify-content:space-between;border-bottom:1px solid #344037;padding-bottom:20px}a{color:var(--accent)}.eyebrow{color:var(--accent);letter-spacing:2px;font-size:12px;text-transform:uppercase}h1{font-size:clamp(36px,6vw,70px);line-height:1.08;max-width:850px;letter-spacing:-3px;margin:24px 0}h2{font-size:21px}p{color:#b8c6bb}.intro{padding:48px 0 32px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}.panel{border:1px solid #344037;border-radius:14px;padding:24px;background:#161e18}button{background:var(--accent);color:#10200a;font:700 16px system-ui;border:0;border-radius:7px;padding:14px 22px;cursor:pointer}button:disabled{opacity:.55;cursor:wait}pre{white-space:pre-wrap;word-break:break-word;font-size:13px;color:#d8eacc;max-height:410px;overflow:auto}li{margin:10px 0}footer{padding:30px 0;color:#9eb1a3;font-size:13px}#map{height:360px;border-radius:10px;margin-top:20px}.flow{font-family:monospace;color:var(--accent)}@media(max-width:760px){.grid{grid-template-columns:1fr}main{padding:18px}h1{letter-spacing:-1px}}
-</style></head><body><main><nav><strong>QQ Pay / Engineering lab</strong><a href="https://github.com/0xMudit/qq-pay">Source ↗</a></nav><section class="intro"><span class="eyebrow">Interactive beta · FastAPI + Supabase PostgreSQL</span><h1>One checkout. One financial effect.</h1><p>Replay a synthetic checkout and capture twice. Inspect the balanced ledger that remains.</p><button id="run">Run the demo →</button><p id="status" role="status" aria-live="polite">No sign-in required. Synthetic data only.</p></section><div class="grid"><section class="panel"><span class="eyebrow">01 / Execution evidence</span><h2 id="resulttitle">Ready when you are</h2><ul id="checks"><li>Run the demo to inspect actual API and database results.</li></ul><div><pre id="result">Results will appear here.</pre></div></section><section class="panel"><span class="eyebrow">02 / System design</span><h2>How it works</h2><p class="flow">Client → Payment intent → Capture → Ledger</p><h2>Correctness boundary</h2><p>A unique idempotency key identifies a request. Conditional capture and both ledger entries commit in one database transaction.</p><h2>Path to scale</h2><p>Scale stateless API instances with pooled PostgreSQL connections. Reconcile provider outcomes through signed, deduplicated webhooks.</p><h2>Demo scope</h2><p>Simulated payments only. Provider integration, refunds and reconciliation are roadmap items.</p><a href="https://github.com/0xMudit/qq-pay/blob/main/docs/architecture.md">Read architecture & tradeoffs ↗</a></section></div><footer>Built to demonstrate engineering judgment. No throughput claims without benchmarks. <a href="/docs">API reference</a> · <a href="https://github.com/0xMudit/qq-pay/issues">Roadmap</a></footer></main><script>let running=false;const button=document.getElementById('run');button.onclick=async()=>{if(running)return;running=true;button.disabled=true;document.getElementById('status').textContent='Running against the API and database…';try{const response=await fetch('/demo/run',{method:'POST'});const data=await response.json();if(!response.ok)throw Error(data.detail||'Request failed');document.getElementById('resulttitle').textContent=data.title;document.getElementById('checks').replaceChildren(...data.checks.map(x=>{const li=document.createElement('li');li.textContent=x;return li}));document.getElementById('result').textContent=JSON.stringify(data.record,null,2);document.getElementById('status').textContent='Completed · '+new Date().toLocaleTimeString();if(window.updateMap)updateMap(data.record.vehicles)}catch(error){document.getElementById('status').textContent=error.message}finally{running=false;button.disabled=false}};</script></body></html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>QQ Pay · Engineering demo</title>
+    <link rel="stylesheet" href="/assets/demo.css" />
+  </head>
+  <body>
+    <main>
+      <nav>
+        <strong>QQ Pay / Engineering lab</strong
+        ><a href="https://github.com/0xMudit/qq-pay">Source ↗</a>
+      </nav>
+      <section class="intro">
+        <span class="eyebrow"
+          >Interactive beta · FastAPI + Supabase PostgreSQL</span
+        >
+        <h1>One checkout. One financial effect.</h1>
+        <p>
+          Replay a synthetic checkout and capture twice. Inspect the balanced
+          ledger that remains.
+        </p>
+        <div class="controls">
+          <button id="run">Run the demo →</button
+          ><button class="secondary" id="replay" disabled>
+            Replay walkthrough</button
+          ><label for="speed" class="eyebrow">Pace</label
+          ><select id="speed">
+            <option value="900">Normal</option>
+            <option value="1800">Slow</option>
+            <option value="300">Quick</option>
+          </select>
+        </div>
+        <p id="status" role="status" aria-live="polite">
+          No sign-in required. Synthetic data only.
+        </p>
+      </section>
+      <section class="trace" aria-label="Backend process walkthrough">
+        <div class="trace-head">
+          <span class="eyebrow"
+            ><span class="live-dot"></span>Process explorer</span
+          >
+          <p id="trace-mode">Explanatory replay · not a distributed trace</p>
+        </div>
+        <div class="stages">
+          <div class="stage">
+            <span class="stage-number">01</span><strong>Intent</strong
+            ><small>Integer minor units</small>
+          </div>
+          <div class="stage">
+            <span class="stage-number">02</span><strong>Deduplicate</strong
+            ><small>Unique request key</small>
+          </div>
+          <div class="stage">
+            <span class="stage-number">03</span><strong>Capture</strong
+            ><small>Atomic transition</small>
+          </div>
+          <div class="stage">
+            <span class="stage-number">04</span><strong>Reconcile</strong
+            ><small>Inspect local ledger</small>
+          </div>
+        </div>
+        <div class="rail"><div class="progress" id="progress"></div></div>
+        <p id="trace-description" aria-live="polite">
+          Run a real backend scenario, then follow each system decision at your
+          own pace.
+        </p>
+      </section>
+      <div class="grid">
+        <section class="panel">
+          <span class="eyebrow">01 / Execution evidence</span>
+          <h2 id="resulttitle">Ready when you are</h2>
+          <ul id="checks">
+            <li>Run the demo to inspect actual API and database results.</li>
+          </ul>
+          <div class="metrics">
+            <div class="metric">
+              <span>Round trip</span><strong id="latency">—</strong>
+            </div>
+            <div class="metric">
+              <span>Outcome</span><strong id="outcome">—</strong>
+            </div>
+            <div class="metric">
+              <span>Evidence</span><strong id="guarantee">—</strong>
+            </div>
+          </div>
+          <details>
+            <summary>Inspect raw API response</summary>
+            <pre id="result">Results will appear here.</pre>
+          </details>
+        </section>
+        <section class="panel">
+          <span class="eyebrow">02 / System design</span>
+          <h2>How it works</h2>
+          <p class="flow">Client → Payment intent → Capture → Ledger</p>
+          <h2>Correctness boundary</h2>
+          <p>
+            A unique idempotency key identifies a request. Conditional capture
+            and both ledger entries commit in one database transaction.
+          </p>
+          <h2>Path to scale</h2>
+          <p>
+            Scale stateless API instances with pooled PostgreSQL connections.
+            Reconcile provider outcomes through signed, deduplicated webhooks.
+          </p>
+          <h2>Demo scope</h2>
+          <p>
+            Simulated payments only. Provider integration, refunds and
+            reconciliation are roadmap items.
+          </p>
+          <a
+            href="https://github.com/0xMudit/qq-pay/blob/main/docs/architecture.md"
+            >Read architecture & tradeoffs ↗</a
+          >
+        </section>
+      </div>
+      <footer>
+        Built to demonstrate engineering judgment. No throughput claims without
+        benchmarks. <a href="/docs">API reference</a> ·
+        <a href="https://github.com/0xMudit/qq-pay/issues">Roadmap</a>
+      </footer>
+    </main>
+    <script id="demo-config" type="application/json">
+      {
+        "kind": "pay",
+        "steps": [
+          {
+            "title": "Intent",
+            "subtitle": "Integer minor units",
+            "description": "The demo requests a synthetic INR 499.00 payment. Money is stored as 49,900 integer minor units, avoiding floating-point rounding."
+          },
+          {
+            "title": "Deduplicate",
+            "subtitle": "Unique request key",
+            "description": "A unique idempotency key makes repeated requests resolve to the same payment. A different amount with that key is rejected."
+          },
+          {
+            "title": "Capture",
+            "subtitle": "Atomic transition",
+            "description": "Only a pending payment can transition to captured. The state update and two ledger entries share one database transaction."
+          },
+          {
+            "title": "Reconcile",
+            "subtitle": "Inspect local ledger",
+            "description": "The demo repeats capture, then reads the local ledger: exactly two entries remain and their signed amounts sum to zero. No external provider is involved."
+          }
+        ]
+      }
+    </script>
+    <script src="/assets/demo.js" defer></script>
+  </body>
+</html>
