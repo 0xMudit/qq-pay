@@ -558,3 +558,20 @@ footer {
     grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   }
 }
+
+[data-slot="card"], [data-slot="alert"], [data-slot="button"][data-variant="outline"] {
+  border-color: var(--border);
+}
+.pay-metrics [data-slot="card"]:last-child { border-color: #504071; }
+.payment-chart {
+  position: relative;
+  isolation: isolate;
+}
+.payment-chart::before {
+  position: absolute;
+  content: "";
+  inset: 2rem 0 1.65rem;
+  z-index: -1;
+  background: repeating-linear-gradient(to top, var(--border) 0 1px, transparent 1px 25%);
+}
+.chart-track { background: transparent; }
